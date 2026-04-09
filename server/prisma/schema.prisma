@@ -1,0 +1,37 @@
+// Task entity for 1Play Global assignment: Postgres via Prisma.
+// - `id` autoincrement primary key for REST /tasks/:id routes.
+// - `status` stored as string (todo | in-progress | done) to match API payloads;
+//   validated in Nest DTOs instead of a DB enum for simpler client alignment.
+// - `dueDate` optional per brief; `createdAt` / `updatedAt` auto-managed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  name       String?
+  avatarUrl  String?
+  provider   String
+  providerId String   @unique
+  tasks      Task[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Task {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  status      String    @default("todo")
+  dueDate     DateTime?
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
