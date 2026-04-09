@@ -2,6 +2,13 @@
 
 A full-stack task management application built with **NestJS**, **Prisma**, **PostgreSQL**, and **React + Vite**. Includes **Google OAuth**, **JWT** (httpOnly cookie), a **User** model with per-user tasks, full CRUD, status filtering, pagination, and Docker-based deployment.
 
+### Features (UI / UX)
+
+- **Kanban + drag-and-drop** — Three-column board (**To Do** / **In Progress** / **Done**) using [**@dnd-kit**](https://docs.dndkit.com/); drag cards between columns to change status.
+- **Optimistic UI** — When a card’s status updates (including via drag-and-drop), local state updates immediately; if the API call fails, the UI **rolls back** to the previous state (`Home.tsx` → `handleTaskMove`).
+- **Search** — **Cmd+K** (and the Search control in the header) opens a command palette that filters tasks by **title and description** (`SearchPalette.tsx`). Matching is done **in the browser** after fetching tasks from `GET /tasks` (no separate search endpoint).
+- **Due-date awareness** — Tasks can have a due date; items past due show **overdue** styling and a warning in the card (`TaskItem.tsx`) while the task is not marked done (in-app only, not email or push notifications).
+
 ### Assignment alignment (1Play Global)
 
 The official brief asks for **Express.js** for the REST API and **React · Node.js · Postgres**. This repo uses **NestJS** on Node.js instead of Express: same HTTP routes and validation goals, with controller/service separation analogous to “routes vs controllers.”
@@ -270,10 +277,8 @@ This is a **known Prisma 7.x + PostgreSQL + Prisma Studio** issue (see [prisma/p
 
 ## What I Would Improve With More Time
 
-1. **Optimistic UI** — instant local updates before server confirmation.
-2. **Search** — full-text title/description search endpoint.
-3. **Due-date reminders** — notification system or email digest.
-4. **Drag-and-drop reordering** — Kanban-style board view.
-5. **E2E tests** — Playwright for the full UI flow.
-6. **CI/CD** — GitHub Actions pipeline: lint → test → build → push Docker image.
-7. **Containerise the client** — serve built React via Nginx in Docker Compose.
+1. **E2E tests** — Playwright for the full UI flow.
+2. **CI/CD** — GitHub Actions pipeline: lint → test → build → push Docker image.
+3. **Containerise the client** — serve built React via Nginx in Docker Compose.
+4. **Server-side search** — Postgres full-text or `ILIKE` endpoint for very large task lists (today search is client-side after `GET /tasks`).
+5. **External due-date reminders** — email or push notifications (today overdue is surfaced only in the UI).
