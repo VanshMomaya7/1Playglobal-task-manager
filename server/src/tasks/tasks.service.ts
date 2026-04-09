@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -45,15 +50,43 @@ export class TasksService {
   }
 
   async create(dto: CreateTaskDto, userId: string) {
-    return this.prisma.task.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        status: dto.status ?? 'todo',
-        userId,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
-      },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException(
+        'No matching user for this session. Sign in with Google again, or set AUTH_BYPASS_USER_ID on the server to a valid User.id from the database.',
+      );
+    }
+
+    let dueDate: Date | null = null;
+    if (dto.dueDate) {
+      const d = new Date(dto.dueDate);
+      if (Number.isNaN(d.getTime())) {
+        throw new BadRequestException('Invalid dueDate');
+      }
+      dueDate = d;
+    }
+
+    try {
+      return await this.prisma.task.create({
+        data: {
+          title: dto.title,
+          description: dto.description,
+          status: dto.status ?? 'todo',
+          userId,
+          dueDate,
+        },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2003'
+      ) {
+        throw new BadRequestException(
+          'Task could not be linked to your user (foreign key). Sign in again or fix AUTH_BYPASS_USER_ID.',
+        );
+      }
+      throw e;
+    }
   }
 
   async update(id: number, dto: UpdateTaskDto, userId: string) {
