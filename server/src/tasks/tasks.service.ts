@@ -53,7 +53,7 @@ export class TasksService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new BadRequestException(
-        'No matching user for this session. Sign in with Google again, or set AUTH_BYPASS_USER_ID on the server to a valid User.id from the database.',
+        'No matching user for this session. The User.id must exist in the same database as this API (e.g. Render Postgres — not your local Docker DB). Sign in with Google once on production, then copy that user id from Render, or run SELECT id, email FROM "User" against your production database.',
       );
     }
 
