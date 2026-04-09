@@ -8,6 +8,10 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 export class AuthController {
   constructor(private readonly jwtService: JwtService) {}
 
+  private frontendUrl(): string {
+    return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  }
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {
@@ -27,12 +31,14 @@ export class AuthController {
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      // For Vercel (frontend) + Render/Railway/etc (API) on different domains,
+      // cross-site requests require SameSite=None + Secure in production.
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     // Send the user to the React front-end application Dashboard
-    res.redirect('http://localhost:5173/dashboard');
+    res.redirect(`${this.frontendUrl()}/dashboard`);
   }
 
   @Get('me')
@@ -44,7 +50,10 @@ export class AuthController {
 
   @Get('logout')
   logout(@Res() res: Response) {
-    res.clearCookie('jwt');
+    res.clearCookie('jwt', {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
     res.json({ message: 'Successfully logged out' });
   }
 }
