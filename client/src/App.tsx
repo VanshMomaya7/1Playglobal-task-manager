@@ -6,10 +6,17 @@ import Landing from './pages/Landing';
 import SearchPalette from './components/SearchPalette';
 import Sidebar from './components/Sidebar';
 
+const AUTH_BYPASS =
+  import.meta.env.VITE_AUTH_BYPASS === 'true' || import.meta.env.VITE_AUTH_BYPASS === '1';
+
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
     return <div style={{height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Loading session...</div>;
+  }
+  // Test mode: open /dashboard directly without Google (pair with server AUTH_BYPASS + AUTH_BYPASS_USER_ID)
+  if (AUTH_BYPASS) {
+    return <>{children}</>;
   }
   if (!user) {
     return <Navigate to="/" replace />;

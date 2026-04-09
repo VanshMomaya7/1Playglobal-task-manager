@@ -5,8 +5,8 @@ import { api } from '../api/tasks';
 export interface User {
   id: string;
   email: string;
-  name: string;
-  avatarUrl: string;
+  name?: string;
+  avatarUrl?: string;
 }
 
 interface AuthContextType {
@@ -22,6 +22,9 @@ const SESSION_STORAGE_KEY = 'tm_jwt';
 // Ensure Axios natively pairs cookies with all API requests globally
 axios.defaults.withCredentials = true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
+const AUTH_BYPASS =
+  import.meta.env.VITE_AUTH_BYPASS === 'true' || import.meta.env.VITE_AUTH_BYPASS === '1';
 
 /** OAuth redirect includes #session=… so Chrome can auth without a cross-site cookie. */
 function applyBearerFromHashAndStorage() {
@@ -62,7 +65,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data } = await axios.get(`${API_BASE}/auth/me`);
         setUser(data);
       } catch {
-        setUser(null);
+        if (AUTH_BYPASS) {
+          // UI-only fallback if API is not configured for bypass (tasks may still 401)
+          setUser({
+            id: import.meta.env.VITE_AUTH_BYPASS_USER_ID || 'dev-bypass',
+            email: import.meta.env.VITE_AUTH_BYPASS_EMAIL || 'test@local',
+            name: 'Test user',
+            avatarUrl: '',
+          });
+        } else {
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
