@@ -1,6 +1,6 @@
 # Task Manager
 
-A full-stack task management application built with **NestJS**, **Prisma**, **PostgreSQL**, and **React + Vite**. Supports full CRUD, status filtering, pagination, and Docker-based deployment.
+A full-stack task management application built with **NestJS**, **Prisma**, **PostgreSQL**, and **React + Vite**. Includes **Google OAuth**, **JWT** (httpOnly cookie), a **User** model with per-user tasks, full CRUD, status filtering, pagination, and Docker-based deployment.
 
 ### Assignment alignment (1Play Global)
 
@@ -17,10 +17,11 @@ task-manager/
 │   │   ├── main.ts          # Bootstrap, CORS, ValidationPipe
 │   │   ├── app.module.ts    # Root module
 │   │   ├── health/          # GET /health
+│   │   ├── auth/            # Google OAuth, JWT strategies, JwtAuthGuard
 │   │   ├── prisma/          # PrismaModule + PrismaService
 │   │   └── tasks/           # TasksModule, Controller, Service, DTOs
 │   ├── prisma/
-│   │   ├── schema.prisma    # Task model
+│   │   ├── schema.prisma    # User + Task models
 │   │   └── migrations/      # Generated Prisma migrations
 │   ├── Dockerfile           # Multi-stage build
 │   ├── docker-entrypoint.sh # migrate deploy → node dist/src/main.js
@@ -30,6 +31,7 @@ task-manager/
 │   │   ├── api/tasks.ts     # Axios API wrapper
 │   │   ├── components/      # TaskForm, TaskList, TaskItem, StatusFilter
 │   │   ├── pages/Home.tsx   # Main page (state, fetch, callbacks)
+│   │   ├── context/         # AuthContext (session via /auth/me)
 │   │   └── App.tsx
 │   └── .env.example
 ├── docker-compose.yml       # postgres + api services
@@ -41,9 +43,25 @@ task-manager/
 
 ## API Routes
 
+**Auth** (no JWT required for Google redirect flow; `/auth/me` requires JWT cookie):
+
+| Method | Route                    | Description                          |
+|--------|--------------------------|--------------------------------------|
+| GET    | /auth/google             | Start Google OAuth                   |
+| GET    | /auth/google/callback    | OAuth callback; sets JWT cookie      |
+| GET    | /auth/me                 | Current user (JWT cookie)            |
+| GET    | /auth/logout             | Clear JWT cookie                     |
+
+**Health** (public — no JWT):
+
 | Method | Route         | Description                    | Status |
 |--------|---------------|--------------------------------|--------|
 | GET    | /health       | Liveness check                 | 200    |
+
+**Tasks** (all **`/tasks`** routes require **JWT** — sign in first; tasks are scoped to the authenticated user):
+
+| Method | Route         | Description                    | Status |
+|--------|---------------|--------------------------------|--------|
 | GET    | /tasks        | List tasks (filter + paginate) | 200    |
 | GET    | /tasks/:id    | Get one task                   | 200/404|
 | POST   | /tasks        | Create task                    | 201    |
@@ -80,6 +98,7 @@ task-manager/
 | `POSTGRES_DB`      | root `.env`     | Docker Compose Postgres DB name   |
 | `VITE_API_BASE_URL`| `client/.env`   | Base URL for Axios (React)        |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `server/.env` | Web OAuth client from Google Cloud |
+| `JWT_SECRET`     | `server/.env`   | Secret for signing JWTs (use a long random string in production) |
 | `GOOGLE_CALLBACK_URL` | `server/.env` (optional) | Defaults to `http://localhost:3000/auth/google/callback` |
 
 ### Google OAuth — fix `invalid_client` / empty client
@@ -147,6 +166,12 @@ npm install
 npm run dev
 # UI available at http://localhost:5173
 ```
+
+### 3. Sign in and use the app
+
+1. In **`server/.env`**, set **`GOOGLE_CLIENT_ID`**, **`GOOGLE_CLIENT_SECRET`**, and **`JWT_SECRET`** (see [`server/.env.example`](server/.env.example)) — required for OAuth outside Docker too.
+2. Open **http://localhost:5173**, click **Sign in with Google**, complete the redirect; you land on **`/dashboard`** with an httpOnly session cookie.
+3. Create and manage tasks from the UI — **`/tasks`** is only available when signed in; data is scoped to your user.
 
 ---
 
@@ -234,22 +259,21 @@ This is a **known Prisma 7.x + PostgreSQL + Prisma Studio** issue (see [prisma/p
 
 ## Assumptions & Trade-offs
 
-- **No authentication** — out of scope for this assignment.
-- **No user model** — bonus feature omitted.
+- **Authentication** — **Google OAuth** with **JWT** in an **httpOnly** cookie. The React app uses **`withCredentials: true`** so the cookie is sent on API calls. **`/tasks`** routes are protected with `JwtAuthGuard`.
+- **User model** — Prisma **`User`** (OAuth provider + `providerId`, email, etc.) with a one-to-many relation to **`Task`** via **`userId`**. List/create/update/delete only touch tasks belonging to the signed-in user.
 - **`status` is a plain string** validated in DTOs (not a Prisma enum) for API/UI alignment simplicity.
 - **Pagination metadata** returned as `{ data, meta }` — documented above.
 - **Client not containerized** — static hosting or `npm run preview` is sufficient for a smoke test.
-- **CORS** allows `localhost:5173` and `localhost:4173` (Vite dev + preview).
+- **CORS** allows `localhost:5173` and `localhost:4173` (Vite dev + preview) with **credentials** enabled for cookie auth.
 
 ---
 
 ## What I Would Improve With More Time
 
-1. **Auth** — JWT-based authentication and per-user task isolation.
-2. **Optimistic UI** — instant local updates before server confirmation.
-3. **Search** — full-text title/description search endpoint.
-4. **Due-date reminders** — notification system or email digest.
-5. **Drag-and-drop reordering** — Kanban-style board view.
-6. **E2E tests** — Playwright for the full UI flow.
-7. **CI/CD** — GitHub Actions pipeline: lint → test → build → push Docker image.
-8. **Containerise the client** — serve built React via Nginx in Docker Compose.
+1. **Optimistic UI** — instant local updates before server confirmation.
+2. **Search** — full-text title/description search endpoint.
+3. **Due-date reminders** — notification system or email digest.
+4. **Drag-and-drop reordering** — Kanban-style board view.
+5. **E2E tests** — Playwright for the full UI flow.
+6. **CI/CD** — GitHub Actions pipeline: lint → test → build → push Docker image.
+7. **Containerise the client** — serve built React via Nginx in Docker Compose.
