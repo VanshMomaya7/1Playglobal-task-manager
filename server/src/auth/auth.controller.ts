@@ -21,24 +21,35 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
-    // Extract authenticated user mapping from GoogleStrategy
-    const user = req.user;
-    
-    // Generate secure JWT token
-    const token = this.jwtService.sign({ sub: user.id, email: user.email });
+    try {
+      // Extract authenticated user mapping from GoogleStrategy
+      const user = req.user;
+      if (!user?.id || !user?.email) {
+        console.error('OAuth callback missing user payload:', user);
+        return res.status(500).json({ message: 'OAuth user payload missing' });
+      }
 
-    // Send HTTP-Only Cookie to intrinsically secure against XSS
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      // For Vercel (frontend) + Render/Railway/etc (API) on different domains,
-      // cross-site requests require SameSite=None + Secure in production.
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+      // Generate secure JWT token
+      const token = this.jwtService.sign({ sub: user.id, email: user.email });
 
-    // Send the user to the React front-end application Dashboard
-    res.redirect(`${this.frontendUrl()}/dashboard`);
+      // Send HTTP-Only Cookie to intrinsically secure against XSS
+      res.cookie('jwt', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        // For Vercel (frontend) + Render/Railway/etc (API) on different domains,
+        // cross-site requests require SameSite=None + Secure in production.
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      // Send the user to the React front-end application Dashboard
+      const target = `${this.frontendUrl()}/dashboard`;
+      console.log('OAuth success, redirecting to:', target);
+      return res.redirect(target);
+    } catch (err) {
+      console.error('OAuth callback failed:', err);
+      return res.status(500).json({ message: 'OAuth callback failed' });
+    }
   }
 
   @Get('me')
