@@ -35,6 +35,7 @@ export class AuthController {
       // Send HTTP-Only Cookie to intrinsically secure against XSS
       res.cookie('jwt', token, {
         httpOnly: true,
+        path: '/',
         secure: process.env.NODE_ENV === 'production',
         // For Vercel (frontend) + Render/Railway/etc (API) on different domains,
         // cross-site requests require SameSite=None + Secure in production.
@@ -42,9 +43,10 @@ export class AuthController {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
-      // Send the user to the React front-end application Dashboard
-      const target = `${this.frontendUrl()}/dashboard`;
-      console.log('OAuth success, redirecting to:', target);
+      // Fragment bootstrap: Chrome often blocks cross-site cookies to the API origin;
+      // Edge may allow them. Client reads #session= once → sessionStorage + Bearer header.
+      const target = `${this.frontendUrl()}/dashboard#session=${encodeURIComponent(token)}`;
+      console.log('OAuth success, redirecting to dashboard (with fragment bootstrap)');
       return res.redirect(target);
     } catch (err) {
       console.error('OAuth callback failed:', err);
@@ -62,6 +64,7 @@ export class AuthController {
   @Get('logout')
   logout(@Res() res: Response) {
     res.clearCookie('jwt', {
+      path: '/',
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     });

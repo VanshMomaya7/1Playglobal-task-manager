@@ -7,14 +7,11 @@ import { ConfigService } from '@nestjs/config';
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(configService: ConfigService) {
     super({
+      // Cookie works when same-site / permissive browsers; Chrome may block cross-site
+      // cookies (Vercel → Render). Authorization: Bearer is the reliable fallback.
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (request: any) => {
-          let token = null;
-          if (request && request.cookies) {
-            token = request.cookies['jwt'];
-          }
-          return token;
-        },
+        (request: any) => request?.cookies?.jwt ?? null,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET') ?? 'fallback-test-secret',

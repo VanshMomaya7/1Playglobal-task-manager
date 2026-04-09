@@ -28,6 +28,12 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Render / other proxies terminate TLS; harmless for cookie + forwarded headers
+  const httpAdapter = app.getHttpAdapter();
+  if (httpAdapter?.getInstance?.()?.set) {
+    httpAdapter.getInstance().set('trust proxy', 1);
+  }
+
   app.use(cookieParser());
 
   app.useGlobalPipes(

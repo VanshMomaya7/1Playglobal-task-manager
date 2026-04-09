@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
+import { api } from '../api/tasks';
 
 export interface User {
   id: string;
@@ -16,20 +17,51 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SESSION_STORAGE_KEY = 'tm_jwt';
+
 // Ensure Axios natively pairs cookies with all API requests globally
 axios.defaults.withCredentials = true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
+/** OAuth redirect includes #session=… so Chrome can auth without a cross-site cookie. */
+function applyBearerFromHashAndStorage() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#session=')) {
+    const raw = hash.slice('#session='.length);
+    try {
+      const token = decodeURIComponent(raw);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+    } catch {
+      /* ignore malformed fragment */
+    }
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+  const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (stored) {
+    const hdr = `Bearer ${stored}`;
+    axios.defaults.headers.common['Authorization'] = hdr;
+    api.defaults.headers.common['Authorization'] = hdr;
+  }
+}
+
+function clearBearerSession() {
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  delete axios.defaults.headers.common['Authorization'];
+  delete api.defaults.headers.common['Authorization'];
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    applyBearerFromHashAndStorage();
+
     const fetchSession = async () => {
       try {
         const { data } = await axios.get(`${API_BASE}/auth/me`);
         setUser(data);
-      } catch (err) {
+      } catch {
         setUser(null);
       } finally {
         setLoading(false);
@@ -41,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await axios.get(`${API_BASE}/auth/logout`);
+      clearBearerSession();
       setUser(null);
       window.location.href = '/';
     } catch (err) {
